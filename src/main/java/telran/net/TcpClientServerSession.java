@@ -1,66 +1,48 @@
 package telran.net;
 
 import java.io.*;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
+import java.net.*;
+
+import static telran.net.TcpConfigurationProperties.*;
 
 public class TcpClientServerSession extends Thread {
-    private Socket socket;
-    private Protocol protocol;
-    private boolean running = true;
-    private static final int IDLE_TIMEOUT = 60000;
+	Socket socket;
+	Protocol protocol;
+	TcpServer tcpServer;
 
-    public TcpClientServerSession(Socket socket, Protocol protocol) {
-        this.socket = socket;
-        this.protocol = protocol;
-    }
+	public TcpClientServerSession(Socket socket, Protocol protocol, TcpServer tcpServer) {
+		this.socket = socket;
+		this.protocol = protocol;
+		this.tcpServer = tcpServer;
+	}
 
-    @Override
-    public void run() {
-        try (InputStream inputStream = socket.getInputStream();
-             OutputStream outputStream = socket.getOutputStream();
-             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-             PrintWriter writer = new PrintWriter(outputStream, true)) {
-
-            socket.setSoTimeout(IDLE_TIMEOUT);
-
-            while (running && !socket.isClosed()) {
-                try {
-                    String line = reader.readLine();
-                    if (line == null) {
-                        running = false;
-                    } else {
-                        String response = protocol.getResponseWithJSON(line);
-                        writer.println(response);
-                    }
-                } catch (SocketTimeoutException e) {
-                    System.out.println("Client idle for more than 1 minute, closing connection.");
-                    running = false;
-                } catch (IOException e) {
-                    if (!socket.isClosed()) {
-                        e.printStackTrace();
-                    }
-                    running = false;
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        close();
-    }
-
-    public void shutdown() {
-        running = false;
-        close();
-    }
-
-    private void close() {
-        try {
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+	@Override
+	public void run() {
+		try (BufferedReader receiver = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				PrintStream sender = new PrintStream(socket.getOutputStream())) {
+			String line = null;
+			boolean sessionRunning = true;
+			socket.setSoTimeout(SOCKET_TIMEOUT);
+			long idleTime = 0;
+			while (tcpServer.running && sessionRunning) {
+				try {
+					line = receiver.readLine();
+					if (line == null) {
+						break;
+					}
+					String responseStr = protocol.getResponseWithJSON(line);
+					sender.println(responseStr);
+					idleTime = 0;
+				} catch (SocketTimeoutException e) {
+					idleTime += SOCKET_TIMEOUT;
+					if (idleTime > SESSION_IDLE_TIMEOUT) {
+						sessionRunning = false;
+					}
+				}
+			}
+			socket.close();
+		} catch (Exception e) {
+			System.out.println(e);
+		}
+	}
 }

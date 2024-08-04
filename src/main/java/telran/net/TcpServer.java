@@ -24,8 +24,9 @@ public class TcpServer implements Runnable {
 	}
 
 	public void shutdown() {
-		running = false;
+		
 		executor.shutdown();
+		running = false;
 
 	}
 
@@ -38,7 +39,12 @@ public class TcpServer implements Runnable {
 			while (running) {
 				try {
 					Socket socket = serverSocket.accept();
-					executor.execute(new TcpClientServerSession(socket, protocol, this));
+					if(running) {
+						executor.execute(new TcpClientServerSession(socket, protocol, this));
+					}
+					else {
+						socket.close();
+					}
 
 				} catch (SocketTimeoutException e) {
 

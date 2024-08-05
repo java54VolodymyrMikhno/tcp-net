@@ -3,6 +3,7 @@ package telran.net;
 import java.net.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static telran.net.TcpConfigurationProperties.*;
 
@@ -25,8 +26,14 @@ public class TcpServer implements Runnable {
 
 	public void shutdown() {
 		
-		executor.shutdown();
+		
 		running = false;
+		executor.shutdownNow();
+		try {
+			executor.awaitTermination(MAX_WAITING_TIME_IN_SECONDS, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			//No interruptions
+		}
 
 	}
 
@@ -39,13 +46,9 @@ public class TcpServer implements Runnable {
 			while (running) {
 				try {
 					Socket socket = serverSocket.accept();
-					if(running) {
-						executor.execute(new TcpClientServerSession(socket, protocol, this));
-					}
-					else {
-						socket.close();
-					}
-
+					TcpClientServerSession session =
+							new TcpClientServerSession(socket, protocol, this);
+					executor.execute(session);
 				} catch (SocketTimeoutException e) {
 
 				}

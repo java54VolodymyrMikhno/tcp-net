@@ -5,7 +5,7 @@ import java.net.*;
 
 import static telran.net.TcpConfigurationProperties.*;
 
-public class TcpClientServerSession extends Thread {
+public class TcpClientServerSession implements Runnable {
 	Socket socket;
 	Protocol protocol;
 	TcpServer tcpServer;
